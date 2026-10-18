@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Combate da Turma 3D (10x10 & 20x20) — Prof. Robson Dias Cavalcante</title>
+  <!-- Google Fonts & Material Symbols -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,1,0" />
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <style>
+    :root {
+      --font-display: 'Fredoka', sans-serif;
+      --font-sans: 'Inter', sans-serif;
+    }
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+      font-family: var(--font-sans);
+      color: #f8fafc;
+    }
+    #canvas-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    .font-title {
+      font-family: var(--font-display);
+      letter-spacing: 0.03em;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    .btn-action {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+    .btn-action:hover {
+      transform: translateY(-1px);
+    }
+    .btn-action:active {
+      transform: translateY(0px) scale(0.97);
+    }
+    .cam-active {
+      background: rgba(250, 204, 21, 0.22) !important;
+      border-color: rgba(250, 204, 21, 0.8) !important;
+      color: #fef08a !important;
+    }
+    @keyframes duelPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+    .duel-card-anim {
+      animation: duelPulse 1.2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Container 3D -->
+  <div id="canvas-container"></div>
+
+  <!-- Camada de Interface -->
+  <div class="relative z-10 pointer-events-none flex flex-col justify-between w-full h-full p-2 sm:p-4">
+
+    <!-- BARRA SUPERIOR -->
+    <header class="pointer-events-auto glass-panel rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 flex flex-wrap items-center justify-between gap-2">
+      <!-- Título, Autor e Seletores de Modo/Turmas -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-emerald-500 to-sky-500 flex items-center justify-center shadow-lg border border-white/30 shrink-0">
+          <span class="material-symbols-rounded text-white text-2xl">shield</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="font-title text-sm sm:text-lg font-bold tracking-wide bg-gradient-to-r from-yellow-200 via-white to-emerald-200 bg-clip-text text-transparent">
+              COMBATE DA TURMA 3D
+            </h1>
+            <span class="hidden xl:inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-white/10 text-slate-200 border border-white/15">
+              Prof. Robson Dias Cavalcante
+            </span>
+          </div>
+
+          <!-- Seletores de Tamanho do Mapa (10x10 vs 20x20) e Turmas (3C, 5A, 5C) -->
+          <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            <select id="select-board-mode" onchange="changeBoardMode(this.value)" class="bg-amber-500/20 text-amber-200 border border-amber-400/50 rounded-lg px-2 py-0.5 text-[11px] font-bold focus:outline-none cursor-pointer" title="Escolha o tamanho do mapa">
+              <option value="10" selected>🗺️ Mapa 10x10 (1 Turma • 30 vs 30)</option>
+              <option value="20">🏰 Mapa 20x20 (2 Turmas • 60 vs 60)</option>
+            </select>
+
+            <select id="select-team-w" onchange="changeMatchup('w', this.value)" class="bg-slate-900/90 text-amber-200 border border-amber-400/40 rounded-lg px-2 py-0.5 text-[11px] font-bold focus:outline-none cursor-pointer">
+              <option value="yellow" selected>🟡 Time Amarelo (Turma 3C)</option>
+              <option value="blue">🔵 Time Azul (Turma 5A)</option>
+              <option value="green">🟢 Time Verde (Turma 5C)</option>
+            </select>
+            <span class="text-[10px] text-slate-400 font-bold">VS</span>
+            <select id="select-team-b" onchange="changeMatchup('b', this.value)" class="bg-slate-900/90 text-sky-200 border border-sky-400/40 rounded-lg px-2 py-0.5 text-[11px] font-bold focus:outline-none cursor-pointer">
+              <option value="yellow">🟡 Time Amarelo (Turma 3C)</option>
+              <option value="blue" selected>🔵 Time Azul (Turma 5A)</option>
+              <option value="green">🟢 Time Verde (Turma 5C)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Indicador Central de Fase / Turno -->
+      <div class="flex items-center gap-2.5 bg-slate-950/80 px-3 py-1.5 rounded-xl border border-white/10">
+        <div id="turn-orb" class="w-3.5 h-3.5 rounded-full bg-yellow-400 shadow-[0_0_12px_#facc15] transition-all duration-500"></div>
+        <div class="text-left">
+          <div id="phase-label" class="text-[9px] uppercase tracking-widest text-amber-300 font-bold">Fase de Estratégia</div>
+          <div id="turn-text" class="font-title text-xs sm:text-sm font-bold text-white">Posicione as Peças!</div>
+        </div>
+      </div>
+
+      <!-- Botões de Ação -->
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <button onclick="openRosterModal()" class="btn-action flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 shadow-lg">
+          <span class="material-symbols-rounded text-base">face</span>
+          <span class="hidden sm:inline">Figurinhas</span>
+        </button>
+
+        <button onclick="openTutorialModal()" class="btn-action flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white shadow-lg">
+          <span class="material-symbols-rounded text-base">military_tech</span>
+          <span class="hidden sm:inline">Patentes</span>
+        </button>
+
+        <button id="btn-fog" onclick="toggleFogMode()" class="btn-action flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-950/80 text-emerald-200 border border-emerald-400/30" title="Alternar quem pode ver as patentes secretas">
+          <span class="material-symbols-rounded text-base" id="fog-icon">visibility</span>
+          <span id="fog-label" class="hidden lg:inline">Visão: Time 1</span>
+        </button>
+
+        <button id="btn-ai" onclick="toggleAIMode()" class="btn-action flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-950/80 text-indigo-200 border border-indigo-400/30">
+          <span class="material-symbols-rounded text-base" id="ai-icon">smart_toy</span>
+          <span id="ai-label" class="hidden lg:inline">Contra Robô</span>
+        </button>
+
+        <button onclick="resetMatch()" class="btn-action p-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/40" title="Nova Partida">
+          <span class="material-symbols-rounded text-base">restart_alt</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ÁREA CENTRAL -->
+    <div class="flex-1 flex items-center justify-between pointer-events-none my-2 relative">
+
+      <!-- Card de Inspeção da Peça Selecionada -->
+      <div id="unit-card" class="glass-panel rounded-2xl p-3.5 w-64 pointer-events-auto transition-all duration-300 opacity-0 -translate-x-4 hidden sm:block border-l-4 border-yellow-400">
+        <div class="flex items-center gap-3 mb-2">
+          <img id="unit-sticker-preview" src="" alt="Avatar" class="w-16 h-16 rounded-2xl border-2 border-yellow-400/70 shadow-lg bg-slate-900 object-cover" />
+          <div>
+            <div class="text-[10px] uppercase tracking-widest text-yellow-300 font-bold" id="unit-faction">Time Amarelo (3C)</div>
+            <h3 class="font-title text-base font-bold text-white leading-tight" id="unit-name">Marechal</h3>
+            <span id="unit-rank-badge" class="inline-block mt-0.5 px-2 py-0.5 rounded bg-amber-500/20 border border-amber-400/40 text-[10px] font-bold text-amber-200">Força: 10</span>
+          </div>
+        </div>
+        <p class="text-xs text-slate-300 leading-relaxed" id="unit-desc">
+          Comandante supremo! Derrota qualquer peça, mas cuidado com o Espião inimigo!
+        </p>
+      </div>
+
+      <!-- Barra Flutuante da Fase de Preparação (Setup) -->
+      <div id="setup-banner" class="pointer-events-auto absolute left-1/2 -translate-x-1/2 bottom-1 glass-panel rounded-2xl px-4 py-2.5 border border-yellow-400/50 flex flex-wrap items-center justify-center gap-2.5 shadow-2xl max-w-2xl w-full">
+        <div class="text-center sm:text-left flex-1 min-w-[200px]">
+          <div class="font-title text-xs sm:text-sm font-bold text-yellow-200">🛠️ Fase de Posicionamento Estratégico</div>
+          <div class="text-[11px] text-slate-300">Clique em 2 peças do mesmo exército para trocar de posição ou sorteie a formação!</div>
+        </div>
+        <div class="flex items-center gap-1.5 flex-wrap justify-center">
+          <button onclick="shuffleTeamSetup('w')" class="btn-action px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-200 border border-amber-400/30">
+            🎲 Sortear Time 1
+          </button>
+          <button onclick="shuffleTeamSetup('b')" class="btn-action px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-sky-200 border border-sky-400/30">
+            🎲 Sortear Time 2
+          </button>
+          <button onclick="startBattlePhase()" class="btn-action px-4 py-1.5 rounded-xl font-title text-xs sm:text-sm font-bold bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg flex items-center gap-1">
+            <span class="material-symbols-rounded text-base">swords</span>
+            <span>Iniciar Combate!</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Toast de Notificação -->
+      <div id="combat-toast" class="pointer-events-none absolute left-1/2 -translate-x-1/2 top-2 px-5 py-2 rounded-full glass-panel border border-yellow-400/60 text-xs sm:text-sm font-bold text-yellow-100 opacity-0 transition-all duration-300 transform -translate-y-3 shadow-2xl text-center">
+        ⚔️ Combate iniciado!
+      </div>
+    </div>
+
+    <!-- BARRA INFERIOR -->
+    <footer class="pointer-events-auto glass-panel rounded-2xl px-3 py-2 sm:px-5 sm:py-2 flex flex-wrap items-center justify-between gap-2">
+      <!-- Contador de Tropas Ativas -->
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1.5 bg-slate-950/65 px-3 py-1 rounded-xl border border-white/10">
+          <span id="tray-dot-w" class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
+          <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Tropas Time 1:</span>
+          <span id="count-w" class="text-xs font-bold text-white">30</span>
+        </div>
+        <div class="flex items-center gap-1.5 bg-slate-950/65 px-3 py-1 rounded-xl border border-white/10">
+          <span id="tray-dot-b" class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+          <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Tropas Time 2:</span>
+          <span id="count-b" class="text-xs font-bold text-white">30</span>
+        </div>
+      </div>
+
+      <!-- Controles de Câmera -->
+      <div class="flex items-center gap-1 sm:gap-1.5">
+        <button id="cam-white" onclick="setCameraView('white')" class="btn-action cam-active px-2.5 py-1 rounded-xl text-xs font-medium bg-slate-800/70 text-slate-300 border border-white/10">Visão Time 1</button>
+        <button id="cam-black" onclick="setCameraView('black')" class="btn-action px-2.5 py-1 rounded-xl text-xs font-medium bg-slate-800/70 text-slate-300 border border-white/10">Visão Time 2</button>
+        <button id="cam-top" onclick="setCameraView('top')" class="btn-action px-2.5 py-1 rounded-xl text-xs font-medium bg-slate-800/70 text-slate-300 border border-white/10">Mapa Topo</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- MODAL DE REVELAÇÃO DE COMBATE (DUELO ENTRE DUAS PEÇAS) -->
+  <div id="duel-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4 pointer-events-auto">
+    <div class="glass-panel rounded-3xl p-6 max-w-lg w-full text-center border-2 border-amber-400/60 shadow-2xl duel-card-anim">
+      <div class="text-xs uppercase tracking-widest text-amber-300 font-bold mb-1">⚔️ Confronto Revelado!</div>
+      <h2 id="duel-title" class="font-title text-xl sm:text-2xl font-bold text-white mb-4">Duelo de Patentes!</h2>
+      
+      <div class="grid grid-cols-3 items-center gap-2 my-4">
+        <!-- Atacante -->
+        <div class="flex flex-col items-center p-3 rounded-2xl bg-slate-900/90 border border-white/15">
+          <span class="text-[10px] uppercase font-bold text-amber-300 mb-1">Atacante</span>
+          <img id="duel-atk-img" src="" class="w-20 h-20 rounded-2xl border-2 border-amber-400 object-cover mb-2" />
+          <div id="duel-atk-rank" class="font-title text-sm font-bold text-white">Marechal</div>
+          <div id="duel-atk-power" class="text-xs text-amber-300 font-bold">Força 10</div>
+        </div>
+
+        <!-- VS -->
+        <div class="flex flex-col items-center justify-center">
+          <div class="w-12 h-12 rounded-full bg-red-600/30 border border-red-400 flex items-center justify-center font-title text-lg font-bold text-red-200 shadow-lg">
+            VS
+          </div>
+        </div>
+
+        <!-- Defensor -->
+        <div class="flex flex-col items-center p-3 rounded-2xl bg-slate-900/90 border border-white/15">
+          <span class="text-[10px] uppercase font-bold text-sky-300 mb-1">Defensor</span>
+          <img id="duel-def-img" src="" class="w-20 h-20 rounded-2xl border-2 border-sky-400 object-cover mb-2" />
+          <div id="duel-def-rank" class="font-title text-sm font-bold text-white">Coronel</div>
+          <div id="duel-def-power" class="text-xs text-sky-300 font-bold">Força 8</div>
+        </div>
+      </div>
+
+      <p id="duel-result-desc" class="text-sm font-semibold text-emerald-300 mb-5 bg-slate-950/80 py-2.5 px-4 rounded-xl border border-white/10">
+        O Marechal (10) venceu o Coronel (8)!
+      </p>
+
+      <button onclick="closeDuelModal()" class="btn-action px-8 py-2.5 rounded-xl font-title font-bold text-sm bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-lg">
+        Continuar Batalha
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL GUIA DE PATENTES E REGRAS -->
+  <div id="tutorial-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/85 backdrop-blur-md p-4">
+    <div class="glass-panel rounded-3xl p-5 sm:p-6 max-w-3xl w-full max-h-[90vh] flex flex-col border border-yellow-400/50 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="material-symbols-rounded text-yellow-300 text-2xl">military_tech</span>
+          <div>
+            <h2 class="font-title text-lg sm:text-xl font-bold text-yellow-100">Hierarquia Completa do Combate (10x10 & 20x20)</h2>
+            <p class="text-xs text-slate-300">Prof. Robson Dias Cavalcante — Turmas 3C (Amarelo), 5A (Azul) e 5C (Verde)</p>
+          </div>
+        </div>
+        <button onclick="closeTutorialModal()" class="btn-action p-1.5 rounded-xl bg-slate-800 text-slate-300">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
+
+      <div class="space-y-3 overflow-y-auto pr-1 text-xs sm:text-sm text-slate-300 flex-1">
+        <div class="p-3 rounded-2xl bg-slate-900/90 border border-yellow-400/30">
+          <strong class="text-yellow-200 block mb-1">🗺️ Modos de Jogo:</strong>
+          • <strong>Mapa 10x10 (Turma Única):</strong> 30 peças por equipe. Ideal para partidas dinâmicas de uma turma.<br>
+          • <strong>Mapa 20x20 (Interclasses 2 Turmas):</strong> 60 peças por equipe! Permite unir duas turmas inteiras em uma mega batalha estratégica.
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-amber-400/40">
+            <div class="font-bold text-amber-300">👑 Marechal (Força 10) & ⭐ General (Força 9)</div>
+            <p class="text-xs text-slate-400">Os comandantes mais fortes! O Marechal (10) só perde para Bombas ou se o <strong>Espião (1)</strong> atacá-lo primeiro!</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-white/10">
+            <div class="font-bold text-amber-200">🦅 Coronel (8), 🌟 Major (7) e 🎖️ Capitão (6)</div>
+            <p class="text-xs text-slate-400">Oficiais superiores. Vencem todas as patentes de número menor.</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-white/10">
+            <div class="font-bold text-white">⚔️ Tenente (5) e 🛡️ Sargento (4)</div>
+            <p class="text-xs text-slate-400">Guerreiros de linha de frente para proteger os oficiais e abrir caminho.</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-emerald-400/40">
+            <div class="font-bold text-emerald-300">🔧 Cabo Armeiro (Força 3)</div>
+            <p class="text-xs text-slate-400">Especialista! É a <strong>ÚNICA</strong> peça que consegue desarmar e destruir as 💣 Bombas inimigas!</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-sky-400/40">
+            <div class="font-bold text-sky-300">🏃 Soldado (Força 2)</div>
+            <p class="text-xs text-slate-400">Explorador veloz! Pode correr quantas casas livres quiser em linha reta (como a Torre do xadrez).</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-purple-400/40">
+            <div class="font-bold text-purple-300">🕵️ Espião (Força 1)</div>
+            <p class="text-xs text-slate-400">Agente infiltrado! Tem Força 1, mas se <strong>ele atacar</strong> o Marechal (10), ele derrota o Marechal!</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-red-400/40">
+            <div class="font-bold text-red-300">💣 Bomba (Imóvel)</div>
+            <p class="text-xs text-slate-400">Não se move! Qualquer peça que atacar a Bomba é eliminada, exceto o Cabo Armeiro (3).</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-yellow-400/40">
+            <div class="font-bold text-yellow-300">🏳️ Bandeira (Imóvel)</div>
+            <p class="text-xs text-slate-400">O objetivo supremo! Quem capturar a Bandeira do adversário vence imediatamente!</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="border-t border-white/10 pt-3 mt-3 text-center">
+        <button onclick="closeTutorialModal()" class="btn-action px-6 py-2 rounded-xl font-title font-bold text-sm bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-950">
+          Entendi, Vamos ao Combate!
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ESTÚDIO DE FIGURINHAS -->
+  <div id="roster-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-6">
+    <div class="glass-panel rounded-3xl p-4 sm:p-6 max-w-5xl w-full max-h-[92vh] flex flex-col border border-yellow-400/40 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+        <div>
+          <h2 class="font-title text-lg font-bold text-yellow-100">Estúdio de Figurinhas — Turmas 3C, 5A e 5C</h2>
+          <p class="text-xs text-slate-300">No modo 20x20 (60 peças), os avatares dos alunos se distribuem automaticamente pelo batalhão!</p>
+        </div>
+        <button onclick="closeRosterModal()" class="p-2 rounded-xl bg-slate-800 text-slate-300"><span class="material-symbols-rounded">close</span></button>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3 bg-slate-950/60 p-2.5 rounded-2xl border border-white/10">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <button id="tab-team-yellow" onclick="switchRosterTab('yellow')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/30 text-amber-200 border border-amber-400">🟡 Time Amarelo (Turma 3C)</button>
+          <button id="tab-team-blue" onclick="switchRosterTab('blue')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-white/10">🔵 Time Azul (Turma 5A)</button>
+          <button id="tab-team-green" onclick="switchRosterTab('green')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-white/10">🟢 Time Verde (Turma 5C)</button>
+        </div>
+
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <label class="btn-action cursor-pointer px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1 shadow">
+            <span class="material-symbols-rounded text-sm">upload_file</span>
+            <span>Upload em Lote</span>
+            <input type="file" accept="image/*" multiple class="hidden" onchange="handleBulkStickerUpload(event)" />
+          </label>
+          <button onclick="exportClassroomPack()" class="btn-action px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1 shadow">
+            <span class="material-symbols-rounded text-sm">download</span>
+            <span>Salvar Pacote (.json)</span>
+          </button>
+          <label class="btn-action cursor-pointer px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 border border-sky-400/40 flex items-center gap-1">
+            <span class="material-symbols-rounded text-sm">folder_open</span>
+            <span>Carregar Pacote</span>
+            <input type="file" accept=".json,application/json" class="hidden" onchange="importClassroomPack(event)" />
+          </label>
+        </div>
+      </div>
+
+      <div id="roster-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 overflow-y-auto pr-1 flex-1"></div>
+
+      <div class="border-t border-white/10 pt-3 mt-3 flex items-center justify-between">
+        <span id="roster-status" class="text-xs text-emerald-300 font-semibold"></span>
+        <button onclick="closeRosterModal()" class="btn-action px-5 py-2 rounded-xl text-xs font-bold bg-yellow-400 text-slate-950">Pronto! Voltar ao Jogo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE VITÓRIA -->
+  <div id="gameover-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-md p-4">
+    <div class="glass-panel rounded-3xl p-6 max-w-md w-full text-center border border-yellow-400/50 shadow-2xl">
+      <div class="w-16 h-16 rounded-2xl bg-yellow-500/20 border border-yellow-400/40 flex items-center justify-center mx-auto mb-3">
+        <span class="material-symbols-rounded text-yellow-300 text-4xl">emoji_events</span>
+      </div>
+      <h2 id="gameover-title" class="font-title text-2xl font-bold text-white mb-2">Vitória Estratégica!</h2>
+      <p id="gameover-desc" class="text-sm text-slate-300 mb-6">A Bandeira adversária foi capturada!</p>
+      <button onclick="resetMatch()" class="btn-action w-full py-3 rounded-xl font-title font-bold text-sm bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-950 shadow-lg">
+        Jogar Nova Batalha
+      </button>
+    </div>
+  </div>
+
+  <script>
+    /********************************************************************
+     * 1. HIERARQUIA COMPLETA DO COMBATE (PATENTES DE 1 A 10 + BOMBA + BANDEIRA)
+     ********************************************************************/
+    const RANKS = {
+      F:  { key: 'F',  name: 'Bandeira',     power: 0,  movable: false, badge: '🏳️', desc: 'O Tesouro da turma! Imóvel. Proteja a sua e capture a do inimigo para vencer!' },
+      B:  { key: 'B',  name: 'Bomba',        power: 99, movable: false, badge: '💣', desc: 'Armadilha imóvel! Elimina qualquer atacante, exceto o Cabo Armeiro (3).' },
+      S:  { key: 'S',  name: 'Espião',       power: 1,  movable: true,  badge: '🕵️', desc: 'Força 1. Se atacar o Marechal (10) primeiro, derrota o Marechal!' },
+      R2: { key: 'R2', name: 'Soldado',      power: 2,  movable: true,  badge: '🏃', desc: 'Força 2. Batedor veloz: pode correr várias casas livres em linha reta!' },
+      R3: { key: 'R3', name: 'Cabo Armeiro', power: 3,  movable: true,  badge: '🔧', desc: 'Força 3. Especialista! Único capaz de desarmar as Bombas inimigas!' },
+      R4: { key: 'R4', name: 'Sargento',     power: 4,  movable: true,  badge: '🛡️', desc: 'Força 4. Combatente de defesa e linha de frente.' },
+      R5: { key: 'R5', name: 'Tenente',      power: 5,  movable: true,  badge: '⚔️', desc: 'Força 5. Oficial tático intermediário.' },
+      R6: { key: 'R6', name: 'Capitão',      power: 6,  movable: true,  badge: '🎖️', desc: 'Força 6. Comandante de companhia.' },
+      R7: { key: 'R7', name: 'Major',        power: 7,  movable: true,  badge: '🌟', desc: 'Força 7. Oficial superior de estratégia.' },
+      R8: { key: 'R8', name: 'Coronel',      power: 8,  movable: true,  badge: '🦅', desc: 'Força 8. Comandante de batalhão de elite.' },
+      R9: { key: 'R9', name: 'General',      power: 9,  movable: true,  badge: '⭐', desc: 'Força 9. Braço direito do Marechal! Derrota quase todo o exército inimigo.' },
+      R10:{ key: 'R10',name: 'Marechal',     power: 10, movable: true,  badge: '👑', desc: 'Força 10. Líder supremo! Só perde para Bombas ou se for atacado pelo Espião (1).' }
+    };
+
+    const BASE_30_ROSTER = [
+      'F',                                    // 1 Bandeira
+      'R10',                                  // 1 Marechal (10)
+      'R9',                                   // 1 General (9)
+      'R8', 'R8',                             // 2 Coronéis (8)
+      'R7', 'R7',                             // 2 Majores (7)
+      'R6', 'R6', 'R6',                       // 3 Capitães (6)
+      'R5', 'R5', 'R5',                       // 3 Tenentes (5)
+      'R4', 'R4', 'R4',                       // 3 Sargentos (4)
+      'R3', 'R3', 'R3', 'R3',                 // 4 Cabos Armeiros (3)
+      'R2', 'R2', 'R2', 'R2', 'R2',           // 5 Soldados (2)
+      'S',                                    // 1 Espião (1)
+      'B', 'B', 'B', 'B'                      // 4 Bombas
+    ];
+
+    function buildArmyComposition(boardSize) {
+      if (boardSize === 10) {
+        return BASE_30_ROSTER.map((rankKey, i) => ({ unitId: i, stickerSlot: i % 30, rankKey }));
+      } else {
+        const list = ['F'];
+        for (let i = 1; i < BASE_30_ROSTER.length; i++) {
+          list.push(BASE_30_ROSTER[i]);
+          list.push(BASE_30_ROSTER[i]);
+        }
+        list.push('R2'); // Completa 60 unidades exatas (3 fileiras de 20)
+        return list.map((rankKey, i) => ({ unitId: i, stickerSlot: i % 30, rankKey }));
+      }
+    }
+
+    // Cores organizadas conforme solicitado: Amarelo (3C), Azul (5A) e Verde (5C)
+    const TEAMS = {
+      yellow: { id: 'yellow', name: 'Time Amarelo (3C)', rimHex: '#facc15', bgGrad: ['#fef08a', '#eab308', '#a16207'], dotClass: 'bg-yellow-400', folder: 'amarelo' },
+      blue:   { id: 'blue',   name: 'Time Azul (5A)',    rimHex: '#38bdf8', bgGrad: ['#bae6fd', '#2563eb', '#1e3a8a'], dotClass: 'bg-sky-400',    folder: 'azul' },
+      green:  { id: 'green',  name: 'Time Verde (5C)',   rimHex: '#4ade80', bgGrad: ['#bbf7d0', '#16a34a', '#14532d'], dotClass: 'bg-emerald-400',folder: 'verde' }
+    };
+
+    let BOARD_SIZE = 10;
+    let activeMatchTeams = { w: 'yellow', b: 'blue' };
+    let currentRosterTab = 'yellow';
+    let isAIMode = true;
+    let fogMode = 'w';
+
+    const MAX_STICKERS = 30;
+    let customRosterData = {
+      yellow: Array(MAX_STICKERS).fill(null),
+      blue:   Array(MAX_STICKERS).fill(null),
+      green:  Array(MAX_STICKERS).fill(null)
+    };
+
+    const stickerTextureCache = {};
+
+    function getTeamForSide(side) {
+      return TEAMS[activeMatchTeams[side]];
+    }
+
+    /********************************************************************
+     * 2. GERADOR DE TEXTURAS DAS FIGURINHAS
+     ********************************************************************/
+    function renderStickerCanvas(teamKey, stickerSlot, rankKey, isHidden) {
+      const team = TEAMS[teamKey];
+      const rank = RANKS[rankKey];
+      const customImg = customRosterData[teamKey][stickerSlot % MAX_STICKERS];
+
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      const ctx = c.getContext('2d');
+      const cx = 256, cy = 240, radius = 195;
+
+      ctx.beginPath(); ctx.arc(cx, cy, radius + 12, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, radius + 3, 0, Math.PI * 2); ctx.fillStyle = team.rimHex; ctx.fill();
+
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, radius - 6, 0, Math.PI * 2); ctx.clip();
+
+      if (isHidden) {
+        const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, radius);
+        grad.addColorStop(0, '#1e293b');
+        grad.addColorStop(1, '#0f172a');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 512, 512);
+
+        ctx.font = 'bold 180px "Fredoka", sans-serif';
+        ctx.fillStyle = team.rimHex;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('?', cx, cy);
+      } else {
+        const grad = ctx.createRadialGradient(cx, cy - 30, 20, cx, cy, radius);
+        grad.addColorStop(0, team.bgGrad[0]);
+        grad.addColorStop(0.7, team.bgGrad[1]);
+        grad.addColorStop(1, team.bgGrad[2]);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 512, 512);
+
+        if (customImg) {
+          const sz = Math.min(customImg.width, customImg.height);
+          ctx.drawImage(customImg, (customImg.width - sz)/2, (customImg.height - sz)/2, sz, sz, cx - radius, cy - radius, radius * 2, radius * 2);
+        } else {
+          ctx.font = '165px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(rank.badge, cx, cy + 5);
+        }
+      }
+      ctx.restore();
+
+      if (!isHidden) {
+        const bx = 415, by = 82, br = 48;
+        ctx.beginPath(); ctx.arc(bx, by, br + 4, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();
+        ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fillStyle = '#0f172a'; ctx.fill();
+        ctx.lineWidth = 5; ctx.strokeStyle = team.rimHex; ctx.stroke();
+
+        ctx.fillStyle = '#fef08a';
+        ctx.font = 'bold 38px "Fredoka", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const powLabel = rank.key === 'F' ? '🏳️' : (rank.key === 'B' ? '💣' : rank.power);
+        ctx.fillText(powLabel, bx, by + 2);
+
+        const pillW = 390, pillH = 72, pillX = cx - pillW / 2, pillY = 412;
+        ctx.fillStyle = '#0f172a';
+        ctx.strokeStyle = team.rimHex;
+        ctx.lineWidth = 7;
+        ctx.beginPath();
+        ctx.roundRect(pillX, pillY, pillW, pillH, 30);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 30px "Fredoka", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(rank.name.toUpperCase(), cx, pillY + 38);
+      } else {
+        const pillW = 340, pillH = 60, pillX = cx - pillW / 2, pillY = 418;
+        ctx.fillStyle = '#0f172a';
+        ctx.strokeStyle = team.rimHex;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.roundRect(pillX, pillY, pillW, pillH, 26);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = team.rimHex;
+        ctx.font = 'bold 26px "Fredoka", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('SECRETO', cx, pillY + 32);
+      }
+
+      return c;
+    }
+
+    function getStickerAsset(color, stickerSlot, rankKey, isHidden) {
+      const team = getTeamForSide(color);
+      const key = `${team.id}_s${stickerSlot}_${rankKey}_${isHidden ? 'hid' : 'vis'}`;
+      if (stickerTextureCache[key]) return stickerTextureCache[key];
+
+      const canvas = renderStickerCanvas(team.id, stickerSlot, rankKey, isHidden);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.needsUpdate = true;
+      const dataUrl = canvas.toDataURL('image/png');
+      stickerTextureCache[key] = { tex, dataUrl };
+      return stickerTextureCache[key];
+    }
+
+    function invalidateTeamCache(teamKey) {
+      Object.keys(stickerTextureCache).forEach(k => {
+        if (k.startsWith(`${teamKey}_`)) delete stickerTextureCache[k];
+      });
+    }
+
+    function loadHostStickers() {
+      ['yellow', 'blue', 'green'].forEach(tKey => {
+        const folder = TEAMS[tKey].folder;
+        for (let i = 0; i < MAX_STICKERS; i++) {
+          const img = new Image();
+          img.src = `images/${folder}_${i + 1}.jpg`;
+          img.onload = () => {
+            customRosterData[tKey][i] = img;
+            invalidateTeamCache(tKey);
+            syncPieces();
+          };
+          img.onerror = () => {
+            const imgPng = new Image();
+            imgPng.src = `images/${folder}_${i + 1}.png`;
+            imgPng.onload = () => {
+              customRosterData[tKey][i] = imgPng;
+              invalidateTeamCache(tKey);
+              syncPieces();
+            };
+          };
+        }
+      });
+    }
+
+    /********************************************************************
+     * 3. CENA 3D E CONSTRUÇÃO DINÂMICA DO MAPA (10x10 OU 20x20)
+     ********************************************************************/
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x0f172a, 0.008);
+
+    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 300);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.maxPolarAngle = Math.PI / 2 - 0.05;
+    controls.minDistance = 6;
+    controls.maxDistance = 65;
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.92));
+    const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.2);
+    dirLight.position.set(14, 28, 16);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
+
+    const boardGroup = new THREE.Group();
+    scene.add(boardGroup);
+
+    const SQUARE_SIZE = 1.6;
+    let squareMeshes = {};
+    const pieceMeshes = [];
+    const highlightMeshes = [];
+
+    function getBoardOffset() {
+      return (BOARD_SIZE * SQUARE_SIZE) / 2 - SQUARE_SIZE / 2;
+    }
+
+    function isLakeSquare(r, c) {
+      if (BOARD_SIZE === 10) {
+        return (r === 4 || r === 5) && (c === 2 || c === 3 || c === 6 || c === 7);
+      } else {
+        const inMidRows = (r >= 8 && r <= 11);
+        const inLakeCols = (c >= 3 && c <= 5) || (c >= 9 && c <= 10) || (c >= 14 && c <= 16);
+        return inMidRows && inLakeCols;
+      }
+    }
+
+    function squareToWorld(r, c) {
+      const offset = getBoardOffset();
+      return new THREE.Vector3(c * SQUARE_SIZE - offset, 0, r * SQUARE_SIZE - offset);
+    }
+
+    function createCoordinateTexture(text) {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 128;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = 'bold 64px "Fredoka", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 64, 64);
+      return new THREE.CanvasTexture(c);
+    }
+
+    function rebuildBoardGeometry() {
+      while (boardGroup.children.length > 0) {
+        boardGroup.remove(boardGroup.children[0]);
+      }
+      squareMeshes = {};
+
+      const totalSpan = BOARD_SIZE * SQUARE_SIZE;
+      const offset = getBoardOffset();
+
+      const frame = new THREE.Mesh(
+        new THREE.BoxGeometry(totalSpan + 1.2, 0.6, totalSpan + 1.2),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 })
+      );
+      frame.position.y = -0.32;
+      boardGroup.add(frame);
+
+      const lightMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.45 });
+      const darkMat  = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.55 });
+      const lakeMat  = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.15, metalness: 0.3 });
+
+      for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          const lake = isLakeSquare(r, c);
+          const isDark = (r + c) % 2 === 1;
+          const mat = lake ? lakeMat : (isDark ? darkMat : lightMat);
+          const mesh = new THREE.Mesh(
+            new THREE.BoxGeometry(SQUARE_SIZE * 0.96, lake ? 0.08 : 0.16, SQUARE_SIZE * 0.96),
+            mat
+          );
+          const pos = squareToWorld(r, c);
+          mesh.position.set(pos.x, lake ? -0.12 : -0.08, pos.z);
+          mesh.receiveShadow = true;
+          mesh.userData = { r, c, lake };
+          boardGroup.add(mesh);
+          squareMeshes[`${r}_${c}`] = mesh;
+        }
+      }
+
+      for (let i = 0; i < BOARD_SIZE; i++) {
+        const colLetter = String.fromCharCode(65 + i);
+        const x = i * SQUARE_SIZE - offset;
+        const zB = (BOARD_SIZE / 2) * SQUARE_SIZE + 0.32;
+        const pCol = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.55, 0.55),
+          new THREE.MeshBasicMaterial({ map: createCoordinateTexture(colLetter), transparent: true })
+        );
+        pCol.rotation.x = -Math.PI / 2;
+        pCol.position.set(x, 0.02, zB);
+        boardGroup.add(pCol);
+
+        const z = i * SQUARE_SIZE - offset;
+        const xL = -(BOARD_SIZE / 2) * SQUARE_SIZE - 0.32;
+        const pRow = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.55, 0.55),
+          new THREE.MeshBasicMaterial({ map: createCoordinateTexture(String(BOARD_SIZE - i)), transparent: true })
+        );
+        pRow.rotation.x = -Math.PI / 2;
+        pRow.position.set(xL, 0.02, z);
+        boardGroup.add(pRow);
+      }
+    }
+
+    /********************************************************************
+     * 4. LÓGICA DO JOGO (POSICIONAMENTO + BATALHA)
+     ********************************************************************/
+    let gamePhase = 'setup';
+    let turn = 'w';
+    let boardState = [];
+    let selectedSq = null;
+    let legalMoves = [];
+
+    function getSetupRows(color) {
+      if (BOARD_SIZE === 10) {
+        return color === 'w' ? [7, 8, 9] : [0, 1, 2];
+      } else {
+        return color === 'w' ? [17, 18, 19] : [0, 1, 2];
+      }
+    }
+
+    function initGame() {
+      rebuildBoardGeometry();
+      setCameraView('white');
+
+      boardState = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
+      shuffleTeamSetup('b', true);
+      shuffleTeamSetup('w', true);
+
+      gamePhase = 'setup';
+      turn = 'w';
+      selectedSq = null;
+      legalMoves = [];
+      document.getElementById('setup-banner').classList.remove('hidden');
+      clearHighlights();
+      syncPieces();
+      updateHUD();
+    }
+
+    window.changeBoardMode = function(newSizeStr) {
+      BOARD_SIZE = parseInt(newSizeStr, 10);
+      initGame();
+      showToast(BOARD_SIZE === 10
+        ? '🗺️ Mapa 10x10 ativado (30 peças por exército)!'
+        : '🏰 Mapa Gigante 20x20 ativado (60 peças por exército)!');
+    };
+
+    window.shuffleTeamSetup = function(color, silent) {
+      if (gamePhase !== 'setup' && !silent) return;
+      const rows = getSetupRows(color);
+      const backRow = color === 'w' ? rows[rows.length - 1] : rows[0];
+      const otherRows = rows.filter(r => r !== backRow);
+
+      const army = buildArmyComposition(BOARD_SIZE);
+      const flagUnit = army.find(u => u.rankKey === 'F');
+      const otherUnits = army.filter(u => u.rankKey !== 'F').sort(() => Math.random() - 0.5);
+
+      const flagCol = Math.floor(Math.random() * BOARD_SIZE);
+      let idx = 0;
+
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        if (c === flagCol) {
+          boardState[backRow][c] = { color, ...flagUnit, revealed: false };
+        } else {
+          boardState[backRow][c] = { color, ...otherUnits[idx++], revealed: false };
+        }
+      }
+
+      otherRows.forEach(r => {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          boardState[r][c] = { color, ...otherUnits[idx++], revealed: false };
+        }
+      });
+
+      selectedSq = null;
+      clearHighlights();
+      syncPieces();
+      if (!silent) showToast(`🎲 Formação do ${getTeamForSide(color).name} sorteada!`);
+    };
+
+    window.startBattlePhase = function() {
+      gamePhase = 'battle';
+      turn = 'w';
+      selectedSq = null;
+      legalMoves = [];
+      clearHighlights();
+      document.getElementById('setup-banner').classList.add('hidden');
+      syncPieces();
+      updateHUD();
+      showToast('⚔️ Batalha Iniciada! Vez do Time 1 mover!');
+    };
+
+    function isPieceHiddenForPlayer(piece) {
+      if (piece.revealed) return false;
+      if (fogMode === 'all') return false;
+      if (fogMode === 'w') return piece.color !== 'w';
+      if (fogMode === 'b') return piece.color !== 'b';
+      if (fogMode === 'turn') return piece.color !== turn;
+      return false;
+    }
+
+    function createTotemMesh(piece) {
+      const group = new THREE.Group();
+      const team = getTeamForSide(piece.color);
+      const hidden = isPieceHiddenForPlayer(piece);
+      const asset = getStickerAsset(piece.color, piece.stickerSlot, piece.rankKey, hidden);
+
+      const base = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.56, 0.64, 0.22, 28),
+        new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.3 })
+      );
+      base.position.y = 0.11;
+      base.castShadow = true;
+      group.add(base);
+
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.58, 0.045, 10, 28),
+        new THREE.MeshStandardMaterial({ color: team.rimHex, metalness: 0.6, roughness: 0.2 })
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = 0.2;
+      group.add(ring);
+
+      const badgeRadius = 0.65;
+      const badgeY = 0.88;
+
+      const rim = new THREE.Mesh(
+        new THREE.TorusGeometry(badgeRadius, 0.06, 12, 32),
+        new THREE.MeshStandardMaterial({ color: team.rimHex, metalness: 0.5, roughness: 0.25 })
+      );
+      rim.position.y = badgeY;
+      group.add(rim);
+
+      const faceMat = new THREE.MeshBasicMaterial({ map: asset.tex, transparent: true });
+      const faceGeo = new THREE.CircleGeometry(badgeRadius * 0.96, 32);
+
+      const front = new THREE.Mesh(faceGeo, faceMat);
+      front.position.set(0, badgeY, 0.035);
+      group.add(front);
+
+      const back = new THREE.Mesh(faceGeo, faceMat);
+      back.rotation.y = Math.PI;
+      back.position.set(0, badgeY, -0.035);
+      group.add(back);
+
+      return group;
+    }
+
+    function syncPieces() {
+      pieceMeshes.forEach(m => scene.remove(m));
+      pieceMeshes.length = 0;
+
+      for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          const p = boardState[r]?.[c];
+          if (p) {
+            const mesh = createTotemMesh(p);
+            const pos = squareToWorld(r, c);
+            mesh.position.set(pos.x, 0, pos.z);
+            mesh.userData = { r, c };
+            scene.add(mesh);
+            pieceMeshes.push(mesh);
+          }
+        }
+      }
+    }
+
+    function getLegalMovesForUnit(r, c) {
+      const p = boardState[r]?.[c];
+      if (!p || p.color !== turn) return [];
+      const rank = RANKS[p.rankKey];
+      if (!rank.movable) return [];
+
+      const moves = [];
+      const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+      dirs.forEach(([dr, dc]) => {
+        if (rank.key === 'R2') {
+          let step = 1;
+          while (true) {
+            const nr = r + dr * step, nc = c + dc * step;
+            if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) break;
+            if (isLakeSquare(nr, nc)) break;
+            const occ = boardState[nr][nc];
+            if (!occ) {
+              moves.push({ r: nr, c: nc, attack: false });
+            } else {
+              if (occ.color !== p.color) moves.push({ r: nr, c: nc, attack: true });
+              break;
+            }
+            step++;
+          }
+        } else {
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && !isLakeSquare(nr, nc)) {
+            const occ = boardState[nr][nc];
+            if (!occ) {
+              moves.push({ r: nr, c: nc, attack: false });
+            } else if (occ.color !== p.color) {
+              moves.push({ r: nr, c: nc, attack: true });
+            }
+          }
+        }
+      });
+
+      return moves;
+    }
+
+    function clearHighlights() {
+      highlightMeshes.forEach(m => scene.remove(m));
+      highlightMeshes.length = 0;
+    }
+
+    function showHighlights(originR, originC, moves) {
+      clearHighlights();
+
+      const selMesh = new THREE.Mesh(
+        new THREE.RingGeometry(0.5, 0.68, 32),
+        new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide })
+      );
+      selMesh.rotation.x = -Math.PI / 2;
+      const oPos = squareToWorld(originR, originC);
+      selMesh.position.set(oPos.x, 0.04, oPos.z);
+      scene.add(selMesh);
+      highlightMeshes.push(selMesh);
+
+      moves.forEach(m => {
+        const marker = new THREE.Mesh(
+          new THREE.RingGeometry(0.42, 0.65, 32),
+          new THREE.MeshBasicMaterial({ color: m.attack ? 0xef4444 : 0x38bdf8, side: THREE.DoubleSide })
+        );
+        marker.rotation.x = -Math.PI / 2;
+        const pos = squareToWorld(m.r, m.c);
+        marker.position.set(pos.x, 0.04, pos.z);
+        marker.userData = { targetR: m.r, targetC: m.c };
+        scene.add(marker);
+        highlightMeshes.push(marker);
+      });
+    }
+
+    function inspectUnit(r, c) {
+      const card = document.getElementById('unit-card');
+      const p = boardState[r]?.[c];
+      if (!p || isPieceHiddenForPlayer(p)) {
+        card.classList.add('opacity-0', '-translate-x-4');
+        return;
+      }
+      const team = getTeamForSide(p.color);
+      const rank = RANKS[p.rankKey];
+      const asset = getStickerAsset(p.color, p.stickerSlot, p.rankKey, false);
+
+      document.getElementById('unit-sticker-preview').src = asset.dataUrl;
+      document.getElementById('unit-faction').textContent = team.name;
+      document.getElementById('unit-name').textContent = `${rank.badge} ${rank.name}`;
+      document.getElementById('unit-rank-badge').textContent = rank.key === 'F' ? 'Objetivo' : (rank.key === 'B' ? 'Armadilha' : `Força: ${rank.power}`);
+      document.getElementById('unit-desc').textContent = rank.desc;
+      card.classList.remove('opacity-0', '-translate-x-4');
+    }
+
+    /********************************************************************
+     * 5. INTERAÇÃO E RESOLUÇÃO DE COMBATE
+     ********************************************************************/
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    window.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('header, footer, #setup-banner, #unit-card, div[id$="-modal"]')) return;
+      if (gamePhase === 'gameover') return;
+      if (gamePhase === 'battle' && isAIMode && turn === 'b') return;
+
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+
+      const hits = raycaster.intersectObjects([...highlightMeshes, ...pieceMeshes, ...Object.values(squareMeshes)], true);
+      if (hits.length === 0) return;
+
+      let obj = hits[0].object;
+      while (obj && !obj.userData.hasOwnProperty('r') && !obj.userData.hasOwnProperty('targetR')) {
+        obj = obj.parent;
+      }
+      if (!obj) return;
+
+      if (gamePhase === 'setup') {
+        if (!obj.userData.hasOwnProperty('r')) return;
+        const r = obj.userData.r, c = obj.userData.c;
+        const clickedPiece = boardState[r][c];
+        if (!clickedPiece) return;
+
+        if (!selectedSq) {
+          selectedSq = { r, c };
+          showHighlights(r, c, []);
+          inspectUnit(r, c);
+        } else {
+          const prevPiece = boardState[selectedSq.r][selectedSq.c];
+          if (prevPiece && prevPiece.color === clickedPiece.color && (selectedSq.r !== r || selectedSq.c !== c)) {
+            boardState[selectedSq.r][selectedSq.c] = clickedPiece;
+            boardState[r][c] = prevPiece;
+            showToast('🔄 Peças trocadas de posição!');
+          }
+          selectedSq = null;
+          clearHighlights();
+          syncPieces();
+        }
+        return;
+      }
+
+      if (obj.userData.hasOwnProperty('targetR')) {
+        const tr = obj.userData.targetR, tc = obj.userData.targetC;
+        executeBattleMove(selectedSq.r, selectedSq.c, tr, tc);
+        return;
+      }
+
+      const r = obj.userData.r, c = obj.userData.c;
+      const existingMove = legalMoves.find(m => m.r === r && m.c === c);
+      if (selectedSq && existingMove) {
+        executeBattleMove(selectedSq.r, selectedSq.c, r, c);
+        return;
+      }
+
+      const piece = boardState[r][c];
+      if (piece && piece.color === turn) {
+        selectedSq = { r, c };
+        legalMoves = getLegalMovesForUnit(r, c);
+        showHighlights(r, c, legalMoves);
+        inspectUnit(r, c);
+      } else {
+        selectedSq = null;
+        legalMoves = [];
+        clearHighlights();
+        inspectUnit(-1, -1);
+      }
+    });
+
+    function executeBattleMove(fr, fc, tr, tc) {
+      const attacker = boardState[fr][fc];
+      const defender = boardState[tr][tc];
+
+      selectedSq = null;
+      legalMoves = [];
+      clearHighlights();
+
+      if (!defender) {
+        boardState[fr][fc] = null;
+        boardState[tr][tc] = attacker;
+        endTurn();
+        return;
+      }
+
+      attacker.revealed = true;
+      defender.revealed = true;
+
+      const atkRank = RANKS[attacker.rankKey];
+      const defRank = RANKS[defender.rankKey];
+
+      let outcome = '';
+      let explanation = '';
+
+      if (defRank.key === 'F') {
+        outcome = 'flag_captured';
+        explanation = `🏆 O ${atkRank.name} capturou a BANDEIRA do ${getTeamForSide(defender.color).name}!`;
+      } else if (defRank.key === 'B') {
+        if (atkRank.key === 'R3') {
+          outcome = 'atk_wins';
+          explanation = `🔧 O Cabo Armeiro (3) desarmou e destruiu a Bomba inimiga!`;
+        } else {
+          outcome = 'def_wins';
+          explanation = `💥 BOOM! O ${atkRank.name} (${atkRank.power}) atingiu uma Bomba e foi eliminado!`;
+        }
+      } else if (atkRank.key === 'S' && defRank.key === 'R10') {
+        outcome = 'atk_wins';
+        explanation = `🕵️ Ataque Secreto! O Espião (1) surpreendeu e derrotou o Marechal (10)!`;
+      } else if (atkRank.power > defRank.power) {
+        outcome = 'atk_wins';
+        explanation = `⚔️ ${atkRank.name} (Força ${atkRank.power}) venceu ${defRank.name} (Força ${defRank.power})!`;
+      } else if (atkRank.power < defRank.power) {
+        outcome = 'def_wins';
+        explanation = `🛡️ ${defRank.name} (Força ${defRank.power}) defendeu e derrotou ${atkRank.name} (Força ${atkRank.power})!`;
+      } else {
+        outcome = 'draw';
+        explanation = `⚡ Empate de Patentes (${atkRank.name} vs ${defRank.name})! Ambas se retiram.`;
+      }
+
+      boardState[fr][fc] = null;
+      if (outcome === 'atk_wins' || outcome === 'flag_captured') {
+        boardState[tr][tc] = attacker;
+      } else if (outcome === 'def_wins') {
+        boardState[tr][tc] = defender;
+      } else if (outcome === 'draw') {
+        boardState[tr][tc] = null;
+      }
+
+      syncPieces();
+      showDuelModal(attacker, defender, atkRank, defRank, explanation, outcome === 'flag_captured');
+    }
+
+    function showDuelModal(attacker, defender, atkRank, defRank, explanation, isFlagWin) {
+      const atkAsset = getStickerAsset(attacker.color, attacker.stickerSlot, attacker.rankKey, false);
+      const defAsset = getStickerAsset(defender.color, defender.stickerSlot, defender.rankKey, false);
+
+      document.getElementById('duel-atk-img').src = atkAsset.dataUrl;
+      document.getElementById('duel-atk-rank').textContent = `${atkRank.badge} ${atkRank.name}`;
+      document.getElementById('duel-atk-power').textContent = `Força ${atkRank.power}`;
+
+      document.getElementById('duel-def-img').src = defAsset.dataUrl;
+      document.getElementById('duel-def-rank').textContent = `${defRank.badge} ${defRank.name}`;
+      document.getElementById('duel-def-power').textContent = defRank.key === 'B' ? 'Armadilha' : (defRank.key === 'F' ? 'Objetivo' : `Força ${defRank.power}`);
+
+      document.getElementById('duel-result-desc').textContent = explanation;
+
+      const modal = document.getElementById('duel-modal');
+      modal.dataset.flagWin = isFlagWin ? attacker.color : '';
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    window.closeDuelModal = function() {
+      const modal = document.getElementById('duel-modal');
+      const winnerColor = modal.dataset.flagWin;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+
+      if (winnerColor) {
+        triggerVictory(winnerColor, `O ${getTeamForSide(winnerColor).name} capturou a Bandeira adversária!`);
+        return;
+      }
+
+      endTurn();
+    };
+
+    function endTurn() {
+      turn = turn === 'w' ? 'b' : 'w';
+      syncPieces();
+      updateHUD();
+
+      let hasMovable = false;
+      for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          if (boardState[r][c]?.color === turn && getLegalMovesForUnit(r, c).length > 0) {
+            hasMovable = true;
+          }
+        }
+      }
+
+      if (!hasMovable) {
+        const winner = turn === 'w' ? 'b' : 'w';
+        triggerVictory(winner, `O ${getTeamForSide(turn).name} não possui mais peças móveis!`);
+        return;
+      }
+
+      if (gamePhase === 'battle' && isAIMode && turn === 'b') {
+        setTimeout(makeAIMove, 550);
+      }
+    }
+
+    function makeAIMove() {
+      if (gamePhase !== 'battle' || turn !== 'b') return;
+      const allMoves = [];
+      for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          if (boardState[r][c]?.color === 'b') {
+            const moves = getLegalMovesForUnit(r, c);
+            moves.forEach(m => allMoves.push({ fr: r, fc: c, tr: m.r, tc: m.c, attack: m.attack }));
+          }
+        }
+      }
+      if (allMoves.length === 0) return;
+
+      allMoves.sort((a, b) => {
+        const scoreA = (a.attack ? 18 : 0) + (a.tr - a.fr) * 3 + Math.random() * 5;
+        const scoreB = (b.attack ? 18 : 0) + (b.tr - b.fr) * 3 + Math.random() * 5;
+        return scoreB - scoreA;
+      });
+
+      const chosen = allMoves[0];
+      executeBattleMove(chosen.fr, chosen.fc, chosen.tr, chosen.tc);
+    }
+
+    function triggerVictory(winnerColor, reason) {
+      gamePhase = 'gameover';
+      const team = getTeamForSide(winnerColor);
+      document.getElementById('gameover-title').textContent = `Vitória do ${team.name}!`;
+      document.getElementById('gameover-desc').textContent = reason;
+      const modal = document.getElementById('gameover-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    /********************************************************************
+     * 6. INTERFACE E ESTÚDIO DE FIGURINHAS (ATÉ 30 SLOTS POR TIME)
+     ********************************************************************/
+    function updateHUD() {
+      const team = getTeamForSide(turn);
+      const phaseEl = document.getElementById('phase-label');
+      const turnEl = document.getElementById('turn-text');
+      const orb = document.getElementById('turn-orb');
+
+      if (gamePhase === 'setup') {
+        phaseEl.textContent = `Mapa ${BOARD_SIZE}x${BOARD_SIZE} • Preparação`;
+        turnEl.textContent = 'Posicione as Peças!';
+        orb.className = 'w-3.5 h-3.5 rounded-full bg-amber-400';
+      } else {
+        phaseEl.textContent = `Mapa ${BOARD_SIZE}x${BOARD_SIZE} • Em Combate`;
+        turnEl.textContent = isAIMode && turn === 'b' ? `${team.name} (Robô)` : team.name;
+        orb.className = `w-3.5 h-3.5 rounded-full ${team.dotClass}`;
+      }
+
+      let w = 0, b = 0;
+      boardState.forEach(row => row.forEach(p => { if (p?.color === 'w') w++; if (p?.color === 'b') b++; }));
+      document.getElementById('count-w').textContent = w;
+      document.getElementById('count-b').textContent = b;
+    }
+
+    window.toggleFogMode = function() {
+      const modes = ['w', 'turn', 'all'];
+      const labels = { w: 'Visão: Time 1', turn: 'Visão: Da Vez', all: 'Visão: Tudo' };
+      fogMode = modes[(modes.indexOf(fogMode) + 1) % modes.length];
+      document.getElementById('fog-label').textContent = labels[fogMode];
+      syncPieces();
+      showToast(`👁️ ${labels[fogMode]}`);
+    };
+
+    window.toggleAIMode = function() {
+      isAIMode = !isAIMode;
+      document.getElementById('ai-icon').textContent = isAIMode ? 'smart_toy' : 'groups';
+      document.getElementById('ai-label').textContent = isAIMode ? 'Contra Robô' : '2 Turmas';
+      showToast(isAIMode ? '🤖 Modo Contra Robô!' : '👥 Modo 2 Turmas (Local)!');
+      updateHUD();
+    };
+
+    window.changeMatchup = function(side, teamKey) {
+      const other = side === 'w' ? 'b' : 'w';
+      if (activeMatchTeams[other] === teamKey) {
+        const avail = ['yellow', 'blue', 'green'].find(t => t !== teamKey);
+        activeMatchTeams[other] = avail;
+        document.getElementById(`select-team-${other}`).value = avail;
+      }
+      activeMatchTeams[side] = teamKey;
+      syncPieces();
+      updateHUD();
+    };
+
+    window.resetMatch = function() {
+      document.getElementById('gameover-modal').classList.add('hidden');
+      document.getElementById('gameover-modal').classList.remove('flex');
+      initGame();
+    };
+
+    function showToast(text) {
+      const t = document.getElementById('combat-toast');
+      t.textContent = text;
+      t.classList.remove('opacity-0', '-translate-y-3');
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.classList.add('opacity-0', '-translate-y-3'), 2600);
+    }
+
+    window.openTutorialModal = function() { document.getElementById('tutorial-modal').classList.remove('hidden'); document.getElementById('tutorial-modal').classList.add('flex'); };
+    window.closeTutorialModal = function() { document.getElementById('tutorial-modal').classList.add('hidden'); document.getElementById('tutorial-modal').classList.remove('flex'); };
+    window.openRosterModal = function() { renderRosterGrid(); document.getElementById('roster-modal').classList.remove('hidden'); document.getElementById('roster-modal').classList.add('flex'); };
+    window.closeRosterModal = function() { document.getElementById('roster-modal').classList.add('hidden'); document.getElementById('roster-modal').classList.remove('flex'); };
+
+    window.switchRosterTab = function(teamKey) {
+      currentRosterTab = teamKey;
+      ['yellow', 'blue', 'green'].forEach(t => {
+        const btn = document.getElementById(`tab-team-${t}`);
+        btn.className = t === teamKey
+          ? 'px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/30 text-amber-200 border border-amber-400'
+          : 'px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-white/10';
+      });
+      renderRosterGrid();
+    };
+
+    function renderRosterGrid() {
+      const grid = document.getElementById('roster-grid');
+      grid.innerHTML = '';
+      const team = TEAMS[currentRosterTab];
+
+      BASE_30_ROSTER.forEach((rankKey, idx) => {
+        const rank = RANKS[rankKey];
+        const previewCanvas = renderStickerCanvas(currentRosterTab, idx, rankKey, false);
+        const prevUrl = previewCanvas.toDataURL('image/png');
+
+        const card = document.createElement('div');
+        card.className = 'p-2.5 rounded-2xl bg-slate-900 border border-white/10 flex items-center gap-2.5';
+        card.innerHTML = `
+          <img src="${prevUrl}" class="w-14 h-14 rounded-2xl border border-yellow-400/50 object-cover bg-slate-950 shrink-0" />
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-bold text-white truncate">${rank.badge} ${rank.name}</div>
+            <div class="text-[10px] text-amber-300 font-semibold">Aluno #${idx + 1} (${team.folder}_${idx + 1}.jpg)</div>
+            <label class="mt-1 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 border border-yellow-400/40 text-[11px] font-semibold cursor-pointer">
+              <span>Trocar Foto</span>
+              <input type="file" accept="image/*" class="hidden" onchange="handleSingleSlotUpload(event, '${currentRosterTab}', ${idx})" />
+            </label>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    window.handleSingleSlotUpload = function(event, teamKey, slotId) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          customRosterData[teamKey][slotId] = img;
+          invalidateTeamCache(teamKey);
+          syncPieces();
+          renderRosterGrid();
+          document.getElementById('roster-status').textContent = `Aluno #${slotId + 1} atualizado!`;
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    window.handleBulkStickerUpload = function(event) {
+      const files = Array.from(event.target.files || []);
+      if (!files.length) return;
+      let count = 0;
+      const teamKey = currentRosterTab;
+      const limit = Math.min(files.length, MAX_STICKERS);
+      files.slice(0, MAX_STICKERS).forEach((file, idx) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            customRosterData[teamKey][idx] = img;
+            count++;
+            if (count === limit) {
+              invalidateTeamCache(teamKey);
+              syncPieces();
+              renderRosterGrid();
+              document.getElementById('roster-status').textContent = `${count} figurinhas carregadas no ${TEAMS[teamKey].name}!`;
+            }
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    };
+
+    window.exportClassroomPack = function() {
+      const exportData = { version: 2, game: 'combate_turma_3d', customRosterDataSerialized: {} };
+      ['yellow', 'blue', 'green'].forEach(t => {
+        exportData.customRosterDataSerialized[t] = customRosterData[t].map(img => {
+          if (!img) return null;
+          const c = document.createElement('canvas');
+          c.width = 256; c.height = 256;
+          const sz = Math.min(img.width, img.height);
+          c.getContext('2d').drawImage(img, (img.width - sz)/2, (img.height - sz)/2, sz, sz, 0, 0, 256, 256);
+          return c.toDataURL('image/webp', 0.85);
+        });
+      });
+      const blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'combate-turmas-figurinhas.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      document.getElementById('roster-status').textContent = 'Pacote (.json) salvo!';
+    };
+
+    window.importClassroomPack = function(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const parsed = JSON.parse(ev.target.result);
+          if (parsed.customRosterDataSerialized) {
+            let pending = 0;
+            ['yellow', 'blue', 'green'].forEach(t => {
+              (parsed.customRosterDataSerialized[t] || []).forEach((dataUrl, i) => {
+                if (dataUrl && i < MAX_STICKERS) {
+                  pending++;
+                  const img = new Image();
+                  img.onload = () => {
+                    customRosterData[t][i] = img;
+                    pending--;
+                    if (pending === 0) {
+                      ['yellow', 'blue', 'green'].forEach(invalidateTeamCache);
+                      syncPieces();
+                      renderRosterGrid();
+                      document.getElementById('roster-status').textContent = 'Pacote carregado com sucesso!';
+                    }
+                  };
+                  img.src = dataUrl;
+                }
+              });
+            });
+          }
+        } catch (e) {
+          alert('Arquivo inválido.');
+        }
+      };
+      reader.readAsText(file);
+    };
+
+    window.setCameraView = function(preset) {
+      ['white', 'black', 'top'].forEach(k => document.getElementById(`cam-${k}`).classList.remove('cam-active'));
+      document.getElementById(`cam-${preset}`).classList.add('cam-active');
+      const dist = BOARD_SIZE === 10 ? 18 : 34;
+      const height = BOARD_SIZE === 10 ? 16 : 30;
+      if (preset === 'white') camera.position.set(0, height, dist);
+      if (preset === 'black') camera.position.set(0, height, -dist);
+      if (preset === 'top')   camera.position.set(0, BOARD_SIZE === 10 ? 25 : 48, 0.01);
+      controls.target.set(0, 0, 0);
+    };
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    initGame();
+    loadHostStickers();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
